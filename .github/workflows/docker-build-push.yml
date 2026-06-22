@@ -147,7 +147,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAGS="${{ steps.meta.outputs.tags }}"
-          if ! echo "$TAGS" | grep -qv "sha-"; then
+          # Check for at least one full MAJOR.MINOR.PATCH version tag (e.g. :1.2.3).
+          # The metadata-action strips the "v" prefix from semver patterns, so we
+          # match the numeric version, not the Git tag format. This catches cases
+          # where metadata-action produced no version tags (e.g. invalid tag context).
+          # A simple "grep -qv sha-" would falsely pass on non-SHA tags like "latest".
+          if ! echo "$TAGS" | grep -qP ':\d+\.\d+\.\d+'; then
             echo "::error::No semver tags generated — verify your tag follows vMAJOR.MINOR.PATCH"
             exit 1
           fi
@@ -181,9 +186,12 @@ jobs:
       - name: Sign the published Docker image
         if: ${{ !startsWith(github.ref, 'refs/pull/') }}
         env:
-          TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes --oidc-provider=github-actions {}@${DIGEST}
+        # Sign the digest once (not per-tag). All tags point to the same digest,
+        # so a single signature covers every tag. When a tag like "latest" later
+        # drifts to a new digest, the old signature correctly does not apply.
+        # This avoids redundant OIDC token exchanges and Rekor transparency log entries.
+        run: cosign sign --yes --oidc-provider=github-actions ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}
 
       # -----------------------------------------------------------------------
       # Docker Hub README sync
