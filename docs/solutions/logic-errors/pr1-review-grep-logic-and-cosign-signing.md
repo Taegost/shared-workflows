@@ -62,12 +62,11 @@ fi
 After:
 ```yaml
 TAGS="${{ steps.meta.outputs.tags }}"
-# Check for at least one full MAJOR.MINOR.PATCH version tag (e.g. :1.2.3).
-# The metadata-action strips the "v" prefix from semver patterns, so we
-# match the numeric version, not the Git tag format. This catches cases
-# where metadata-action produced no version tags (e.g. invalid tag context).
+# Check for at least one full MAJOR.MINOR.PATCH version tag (e.g. :1.2.3 or :v1.2.3).
+# The metadata-action produces both v-prefixed and non-prefixed semver tags.
+# This catches cases where metadata-action produced no version tags (e.g. invalid tag context).
 # A simple "grep -qv sha-" would falsely pass on non-SHA tags like "latest".
-if ! echo "$TAGS" | grep -qP ':\d+\.\d+\.\d+'; then
+if ! echo "$TAGS" | grep -qP ':v?\d+\.\d+\.\d+'; then
   echo "::error::No semver tags generated — verify your tag follows vMAJOR.MINOR.PATCH"
   exit 1
 fi
@@ -96,8 +95,9 @@ run: cosign sign --yes --oidc-provider=github-actions ${{ env.REGISTRY }}/${{ en
 
 ## Why This Works
 
-**Bug 1:** The Perl regex `:\d+\.\d+\.\d+` matches exactly the pattern semver tags produce after the metadata-action strips the `v` prefix. From the tag output:
+**Bug 1:** The Perl regex `:v?\d+\.\d+\.\d+` matches exactly the pattern semver tags produce — with or without the `v` prefix. The metadata-action generates both `v`-prefixed and non-prefixed tags (e.g. `v1.2.3` and `1.2.3`). From the tag output:
 ```
+docker.io/user/image:v1.2.3     ← matches (v-prefixed semver)
 docker.io/user/image:1.2.3      ← matches (three dot-separated numeric groups)
 docker.io/user/image:1.2        ← no match (only two groups)
 docker.io/user/image:1          ← no match (single digit)

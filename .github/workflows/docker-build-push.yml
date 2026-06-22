@@ -128,9 +128,13 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             # Semver tags from Git version tags (e.g. v1.2.3)
+            # {{version}} strips the "v" prefix; v{{version}} preserves it
             type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=semver,pattern=v{{major}}
             # 'latest' on pushes to main, version tags, and scheduled runs
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/') || inputs.event_name == 'schedule' }}
             # Short SHA for full traceability on every build
@@ -146,12 +150,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAGS="${{ steps.meta.outputs.tags }}"
-          # Check for at least one full MAJOR.MINOR.PATCH version tag (e.g. :1.2.3).
-          # The metadata-action strips the "v" prefix from semver patterns, so we
-          # match the numeric version, not the Git tag format. This catches cases
-          # where metadata-action produced no version tags (e.g. invalid tag context).
+          # Check for at least one full MAJOR.MINOR.PATCH version tag (e.g. :1.2.3 or :v1.2.3).
+          # The metadata-action produces both v-prefixed and non-prefixed semver tags.
+          # This catches cases where metadata-action produced no version tags (e.g. invalid tag context).
           # A simple "grep -qv sha-" would falsely pass on non-SHA tags like "latest".
-          if ! echo "$TAGS" | grep -qP ':\d+\.\d+\.\d+'; then
+          if ! echo "$TAGS" | grep -qP ':v?\d+\.\d+\.\d+'; then
             echo "::error::No semver tags generated — verify your tag follows vMAJOR.MINOR.PATCH"
             exit 1
           fi
