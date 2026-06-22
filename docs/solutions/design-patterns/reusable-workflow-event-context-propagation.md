@@ -24,7 +24,7 @@ tags:
 
 ## Context
 
-When a reusable workflow is invoked via `workflow_call`, GitHub sets `github.event_name` to `"workflow_call"` inside the reusable workflow -- it does NOT reflect the original trigger event that started the caller. This means a reusable workflow cannot determine whether it was invoked by a schedule trigger, a tag push, a pull request, or any other event.
+When a reusable workflow is invoked via `workflow_call`, `github.event_name` is still present inside the reusable workflow but is always set to the string `"workflow_call"` -- it does NOT reflect the original trigger event that started the caller. This means a reusable workflow cannot determine whether it was invoked by a schedule trigger, a tag push, a pull request, or any other event by checking `github.event_name`.
 
 In a concrete case, a reusable Docker build-and-push workflow needed to apply different tagging strategies depending on the trigger: semver tags get versioned tags, while schedule triggers should only update the `latest` tag. The plan's transformation rules replaced `github.event_name`-based conditionals with `github.ref`-based equivalents, but this approach fails for schedule triggers because `github.ref` on a schedule event defaults to the default branch ref, making it indistinguishable from a regular push-to-main.
 
@@ -92,7 +92,7 @@ When migrating a standalone workflow to a reusable `workflow_call` workflow, app
 | `github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')` | `startsWith(github.ref, 'refs/tags/')` |
 | `github.event_name != 'pull_request'` | `${{ !startsWith(github.ref, 'refs/pull/') }}` |
 | `push: ${{ github.event_name != 'pull_request' }}` | `push: ${{ !startsWith(github.ref, 'refs/pull/') }}` |
-| `enable={{is_default_branch}}` (metadata-action tagging) | `enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) \|\| inputs.schedule_trigger }}` |
+| `enable={{is_default_branch}}` (metadata-action tagging) | `enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) \|\| startsWith(github.ref, 'refs/tags/') \|\| inputs.schedule_trigger }}` |
 
 The `github.ref` on a pull request is `refs/pull/N/merge`, so `startsWith(github.ref, 'refs/pull/')` is the correct inverse of `github.event_name != 'pull_request'`. The `{{is_default_branch}}` template variable from `docker/metadata-action` may not resolve correctly in a reusable workflow context, so use an explicit `format()` expression instead.
 
