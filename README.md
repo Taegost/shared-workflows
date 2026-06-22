@@ -42,7 +42,10 @@ jobs:
     uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.0
     with:
       event_name: ${{ github.event_name }}
-    secrets: inherit
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_IMAGENAME: ${{ secrets.DOCKERHUB_IMAGENAME }}
 ```
 
 The example references `@v1.0.0`. Use whatever version tag fits your needs — `@main` for the latest, or a specific release tag for stability.
