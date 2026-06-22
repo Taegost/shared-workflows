@@ -1,0 +1,17 @@
+name: Build and Publish
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+jobs:
+  build:
+    uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.0
+    with:
+      event_name: ${{ github.event_name }}
+    secrets: inherit
