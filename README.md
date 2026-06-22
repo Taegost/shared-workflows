@@ -41,7 +41,7 @@ jobs:
   build:
     uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.0
     with:
-      schedule_trigger: ${{ github.event_name == 'schedule' }}
+      event_name: ${{ github.event_name }}
     secrets: inherit
 ```
 

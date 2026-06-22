@@ -5,8 +5,8 @@
 # it to Docker Hub.
 #
 # NOTE: This is a reusable workflow. Triggers are defined by the caller.
-# The caller must pass schedule_trigger=true when the original event is
-# 'schedule' so this workflow can apply latest-only tagging.
+# The caller must pass event_name=${{ github.event_name }} so this workflow
+# can distinguish schedule triggers from other events for tagging.
 #
 # REQUIRED SECRETS (Settings → Secrets and variables → Actions):
 #   DOCKERHUB_USERNAME   — your Docker Hub username (org-level secret)
@@ -15,7 +15,6 @@
 #   DOCKERHUB_IMAGENAME  — image name, ex devops-toolbox (repo-level secret)
 #
 # TAGGING STRATEGY:
-#   Push to main:    latest, sha-<short-commit>
 #   Tag v1.2.3:      1.2.3, 1.2, 1, latest, sha-<short-commit>
 #   Pull request:    no push, build validation only
 #   Scheduled:       latest, sha-<short-commit>
@@ -26,11 +25,11 @@ name: Build and Publish
 on:
   workflow_call:
     inputs:
-      schedule_trigger:
-        description: 'Set to true when caller is triggered by schedule (applies latest-only tagging)'
+      event_name:
+        description: 'Caller github.event_name — required when the caller has a schedule trigger so this workflow can apply latest-only tagging'
         required: false
-        default: false
-        type: boolean
+        default: ''
+        type: string
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -133,7 +132,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             # 'latest' on pushes to main, version tags, and scheduled runs
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/') || inputs.schedule_trigger }}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/') || inputs.event_name == 'schedule' }}
             # Short SHA for full traceability on every build
             type=sha,format=short
 

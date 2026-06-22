@@ -1,7 +1,7 @@
 ---
 title: "Passing Event Context into Reusable GitHub Actions Workflows"
 date: "2026-06-21"
-last_updated: "2026-06-21"
+last_updated: "2026-06-22"
 category: docs/solutions/design-patterns
 module: shared-workflows
 problem_type: design_pattern
@@ -10,7 +10,7 @@ severity: medium
 applies_when:
   - "Reusable workflows called via workflow_call need to distinguish trigger events"
   - "Schedule triggers must apply different logic than push or tag triggers"
-  - "github.event_name is unavailable inside the reusable workflow"
+  - "github.event_name is always workflow_call inside the reusable workflow"
 tags:
   - github-actions
   - reusable-workflows
@@ -34,7 +34,7 @@ The intended behavior was: schedule triggers run the full pipeline (like a semve
 
 **Pattern: Pass event context as an explicit input parameter.**
 
-The calling workflow has access to the real `github.event_name`. By passing this value (or a derived boolean) as an input to the reusable workflow, the reusable workflow can branch on the actual trigger event.
+The calling workflow has access to the real `github.event_name`. By passing this value as an input to the reusable workflow, the reusable workflow can branch on the actual trigger event.
 
 **Reusable workflow definition -- declare the input:**
 
@@ -42,11 +42,11 @@ The calling workflow has access to the real `github.event_name`. By passing this
 on:
   workflow_call:
     inputs:
-      schedule_trigger:
-        description: 'Set to true when caller is triggered by schedule (applies latest-only tagging)'
+      event_name:
+        description: 'Caller github.event_name — required when the caller has a schedule trigger so this workflow can apply latest-only tagging'
         required: false
-        default: false
-        type: boolean
+        default: ''
+        type: string
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -63,7 +63,7 @@ jobs:
   build:
     uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.0
     with:
-      schedule_trigger: ${{ github.event_name == 'schedule' }}
+      event_name: ${{ github.event_name }}
     secrets: inherit
 ```
 
@@ -73,7 +73,7 @@ jobs:
 - name: Determine Docker tags
   id: tags
   run: |
-    if [[ "${{ inputs.schedule_trigger }}" == "true" ]]; then
+    if [[ "${{ inputs.event_name }}" == "schedule" ]]; then
       echo "tags=latest" >> "$GITHUB_OUTPUT"
     else
       # Apply semver versioned tagging
@@ -81,7 +81,7 @@ jobs:
     fi
 ```
 
-The boolean input is explicit, self-documenting, and decouples the reusable workflow from any knowledge of the caller's trigger mechanism.
+The string input passes the full event name, making it self-documenting and future-proof. The reusable workflow decouples from the caller's trigger mechanism while retaining enough information to branch on any event type.
 
 **Full transformation table for `github.event_name` → `github.ref` replacements:**
 
@@ -92,7 +92,7 @@ When migrating a standalone workflow to a reusable `workflow_call` workflow, app
 | `github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')` | `startsWith(github.ref, 'refs/tags/')` |
 | `github.event_name != 'pull_request'` | `${{ !startsWith(github.ref, 'refs/pull/') }}` |
 | `push: ${{ github.event_name != 'pull_request' }}` | `push: ${{ !startsWith(github.ref, 'refs/pull/') }}` |
-| `enable={{is_default_branch}}` (metadata-action tagging) | `enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) \|\| startsWith(github.ref, 'refs/tags/') \|\| inputs.schedule_trigger }}` |
+| `enable={{is_default_branch}}` (metadata-action tagging) | `enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) \|\| startsWith(github.ref, 'refs/tags/') \|\| inputs.event_name == 'schedule' }}` |
 
 The `github.ref` on a pull request is `refs/pull/N/merge`, so `startsWith(github.ref, 'refs/pull/')` is the correct inverse of `github.event_name != 'pull_request'`. The `{{is_default_branch}}` template variable from `docker/metadata-action` may not resolve correctly in a reusable workflow context, so use an explicit `format()` expression instead.
 
@@ -139,12 +139,12 @@ On a schedule trigger, `github.ref` is `refs/heads/main`, so the else branch run
 
 **After -- correct: explicit input parameter**
 
-Reusable workflow declares `schedule_trigger` input and branches on it:
+Reusable workflow declares `event_name` input and branches on it:
 ```yaml
 - name: Determine tags
   id: tags
   run: |
-    if [[ "${{ inputs.schedule_trigger }}" == "true" ]]; then
+    if [[ "${{ inputs.event_name }}" == "schedule" ]]; then
       # Schedule trigger: run full pipeline, only update latest tag
       echo "tags=latest" >> "$GITHUB_OUTPUT"
     elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -162,7 +162,7 @@ jobs:
   build:
     uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.0
     with:
-      schedule_trigger: ${{ github.event_name == 'schedule' }}
+      event_name: ${{ github.event_name }}
     secrets: inherit
 ```
 
