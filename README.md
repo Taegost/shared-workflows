@@ -42,7 +42,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.0
+    uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.1
     with:
       event_name: ${{ github.event_name }}
     secrets:
