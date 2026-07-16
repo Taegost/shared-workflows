@@ -2,10 +2,6 @@
 
 Reusable GitHub Actions workflows shared across Taegost's projects.
 
-## Current State
-
-This repo is in the **planning phase**. The Docker build-and-push reusable workflow has been planned (`docs/plans/`) but not yet implemented. No `.github/workflows/` directory exists yet.
-
 ## Architecture
 
 The repo follows a **reusable workflow + caller template** pattern:

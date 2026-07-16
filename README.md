@@ -21,6 +21,14 @@ A reusable workflow that builds multi-arch Docker images and pushes them to Dock
 
 > **Note:** For `workflow_dispatch` (manual testing from the shared repo itself), these three secrets must be configured as repository secrets in `Taegost/shared-workflows`. The `secrets: inherit` mechanism only applies when the workflow is called via `workflow_call` from another repo.
 
+### Optional Inputs
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enable_from_cache` | boolean | `false` | Whether **schedule** and **manual (`workflow_dispatch`)** runs may read from the Docker layer cache. Defaults to `false` so these ad-hoc runs always pull fresh base image layers instead of risking a stale cached layer masking an upstream security patch. Tag-push and pull_request runs always use the cache regardless of this setting. Set to `true` to speed up scheduled/manual runs at the cost of possibly reusing stale base image layers. |
+
+> **⚠️ Breaking change:** prior versions of this workflow always read from the build cache on every trigger, including scheduled and manual runs. As of the version introducing `enable_from_cache`, scheduled and manual runs skip the cache by default. Repos that want the old cache-accelerated behavior for these triggers must add `enable_from_cache: true` to their caller's `with:` block, or check the box in the Actions UI when manually running the workflow.
+
 ### Usage
 
 Copy the following into your consumer repo at `.github/workflows/build-and-push.yml`:
@@ -37,6 +45,12 @@ on:
   schedule:
     - cron: '0 4 * * 1'
   workflow_dispatch:
+    inputs:
+      enable_from_cache:
+        description: 'Read from the Docker layer cache on this manual run (default: false, always pulls fresh base image layers)'
+        required: false
+        default: false
+        type: boolean
 jobs:
   build:
     permissions:
@@ -45,6 +59,7 @@ jobs:
     uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.1
     with:
       event_name: ${{ github.event_name }}
+      enable_from_cache: ${{ inputs.enable_from_cache || false }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

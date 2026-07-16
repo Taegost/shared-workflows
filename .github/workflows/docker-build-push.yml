@@ -18,6 +18,13 @@
 #   Tag v1.2.3:      1.2.3, 1.2, 1, latest, sha-<short-commit>
 #   Pull request:    no push, build validation only
 #   Scheduled:       latest, sha-<short-commit>
+#
+# CACHING STRATEGY:
+#   Tag push / PR:          always reads and writes the GHA layer cache
+#   Scheduled / manual run: skips reading the cache by default (always pulls
+#                            fresh base image layers) but still writes to the
+#                            cache; set enable_from_cache: true to opt back
+#                            into reading the cache on these ad-hoc runs
 # =============================================================================
 
 name: Build and Publish
@@ -30,6 +37,11 @@ on:
         required: false
         default: ''
         type: string
+      enable_from_cache:
+        description: 'Whether schedule or manual (workflow_dispatch) runs may read from the Docker layer cache. Defaults to false so these ad-hoc runs always pull fresh base image layers to catch upstream security patches; set true to speed them up at the cost of possibly reusing stale base image layers. Tag-push and pull_request runs always use the cache regardless of this setting.'
+        required: false
+        default: false
+        type: boolean
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -38,6 +50,12 @@ on:
       DOCKERHUB_IMAGENAME:
         required: true
   workflow_dispatch:
+    inputs:
+      enable_from_cache:
+        description: 'Whether this manual run may read from the Docker layer cache. Defaults to false so ad-hoc runs always pull fresh base image layers to catch upstream security patches.'
+        required: false
+        default: false
+        type: boolean
 
 env:
   REGISTRY: docker.io
@@ -165,6 +183,12 @@ jobs:
       # - Push is skipped on PRs (validation build only)
       # - GHA cache keeps rebuild times fast for unchanged layers
       # - context: . is explicit so .dockerignore is respected
+      # - cache-from is skipped by default on scheduled/manual runs so they
+      #   always pull fresh base image layers instead of masking upstream
+      #   security patches with a stale cached layer; cache-to always runs so
+      #   the refreshed layers still populate the cache for the next tag/PR
+      #   build. Opt back into reading the cache on these runs by passing
+      #   enable_from_cache: true.
       # -----------------------------------------------------------------------
       - name: Build and push Docker image
         id: build-and-push
@@ -175,7 +199,7 @@ jobs:
           push: ${{ !startsWith(github.ref, 'refs/pull/') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          cache-from: ${{ (!(inputs.event_name == 'schedule' || inputs.event_name == 'workflow_dispatch' || github.event_name == 'workflow_dispatch') || inputs.enable_from_cache) && 'type=gha' || '' }}
           cache-to: type=gha,mode=max
 
       # -----------------------------------------------------------------------
