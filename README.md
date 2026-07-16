@@ -25,9 +25,11 @@ A reusable workflow that builds multi-arch Docker images and pushes them to Dock
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enable_from_cache` | boolean | `false` | Whether **schedule** and **manual (`workflow_dispatch`)** runs may read from the Docker layer cache. Defaults to `false` so these ad-hoc runs always pull fresh base image layers instead of risking a stale cached layer masking an upstream security patch. Tag-push and pull_request runs always use the cache regardless of this setting. Set to `true` to speed up scheduled/manual runs at the cost of possibly reusing stale base image layers. |
+| `enable_from_cache` | boolean | `false` | Whether **schedule** and **manual (`workflow_dispatch`)** runs may read from the Docker layer cache. Defaults to `false` so these ad-hoc runs always pull fresh base image layers instead of risking a stale cached layer masking an upstream security patch. Tag-push and pull_request runs always use the cache regardless of this setting. |
 
-> **⚠️ Breaking change:** prior versions of this workflow always read from the build cache on every trigger, including scheduled and manual runs. As of the version introducing `enable_from_cache`, scheduled and manual runs skip the cache by default. Repos that want the old cache-accelerated behavior for these triggers must add `enable_from_cache: true` to their caller's `with:` block, or check the box in the Actions UI when manually running the workflow.
+Scheduled runs always pass `false` — there's no way to interact with a cron-triggered run, so caching there is a fixed, deliberate off. Manual runs are different: the caller template below exposes `enable_from_cache` as a `workflow_dispatch` input, so whoever clicks "Run workflow" in the Actions tab gets a checkbox and decides per run whether that build should read from cache — no caller YAML edits needed to exercise the choice.
+
+> **⚠️ Breaking change:** prior versions of this workflow always read from the build cache on every trigger, including scheduled and manual runs. As of the version introducing `enable_from_cache`, scheduled runs skip the cache unconditionally, and manual runs skip it unless the checkbox is checked at dispatch time. Existing callers get this safer default automatically once they bump their pinned version tag — no `with:` block edits required. Repos that want scheduled builds specifically to keep reading the cache can hardcode `enable_from_cache: true` in their caller's `with:` block instead of forwarding the dispatch input, at the cost of losing the per-run manual toggle.
 
 ### Usage
 

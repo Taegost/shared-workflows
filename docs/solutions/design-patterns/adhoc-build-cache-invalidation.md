@@ -79,7 +79,7 @@ The condition covers three distinct trigger paths with one expression:
 2. `inputs.event_name == 'workflow_dispatch'` — a consumer manually ran their own caller workflow, which forwarded the trigger via `workflow_call`.
 3. `github.event_name == 'workflow_dispatch'` — this reusable workflow was dispatched directly (no caller involved), the shared-repo manual-testing path.
 
-**Caller template — forward the input, defaulting safely on non-dispatch triggers:**
+**Caller template — expose a per-run checkbox for manual dispatch, forward it with a safe fallback for every other trigger:**
 
 ```yaml
 on:
@@ -99,7 +99,9 @@ jobs:
     secrets: inherit
 ```
 
-`inputs.enable_from_cache` is only populated when the caller itself was `workflow_dispatch`-triggered; on push/PR/schedule triggers it evaluates to an empty value, so `|| false` makes the fallback explicit instead of passing an undefined value into a boolean input.
+`inputs.enable_from_cache` is only populated when the caller itself was `workflow_dispatch`-triggered — GitHub Actions only populates the `inputs` context for `workflow_dispatch` and `workflow_call` events. On push/PR/schedule triggers it's an empty object, so `inputs.enable_from_cache` evaluates to `null` (not an error), and `|| false` supplies the safe default. This gives two different behaviors from one expression: a scheduled run always gets `false` (there's no UI to interact with a cron trigger, so it's a fixed, deliberate off), while a manually-dispatched run lets whoever clicks "Run workflow" decide per run via a checkbox — no YAML edits needed to exercise that choice, only to change the *default* the checkbox starts from.
+
+A consumer that wants scheduled builds specifically to keep reading the cache can replace the expression with a hardcoded `enable_from_cache: true`, but that also removes the per-run manual override — the checkbox no longer has any effect once the value is a literal instead of `${{ inputs.enable_from_cache || false }}`. Don't reach for that unless the manual toggle is genuinely not needed.
 
 ## Why This Matters
 
