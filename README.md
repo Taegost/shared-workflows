@@ -58,7 +58,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v1.0.1
+    uses: Taegost/shared-workflows/.github/workflows/docker-build-push.yml@v2.0.0
     with:
       event_name: ${{ github.event_name }}
       enable_from_cache: ${{ inputs.enable_from_cache || false }}
@@ -68,7 +68,7 @@ jobs:
       DOCKERHUB_IMAGENAME: ${{ secrets.DOCKERHUB_IMAGENAME }}
 ```
 
-The example references `@v1.0.0`. Use whatever version tag fits your needs — `@main` for the latest, or a specific release tag for stability.
+The example references `@v2.0.0` — first tag with breaking `enable_from_cache` default change. Use whatever version tag fits your needs — `@main` for latest, specific release tag for stability. Callers pinned below `v2.0.0` keep old always-cache behavior until bumped.
 
 ### Supported Triggers
 
