@@ -42,6 +42,11 @@ on:
         required: false
         default: false
         type: boolean
+      dockerfile:
+        description: 'Path to the Dockerfile within the caller repository (relative to the repository root). Defaults to ./Dockerfile — callers with a root Dockerfile are unaffected.'
+        required: false
+        default: './Dockerfile'
+        type: string
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -189,12 +194,14 @@ jobs:
       #   the refreshed layers still populate the cache for the next tag/PR
       #   build. Opt back into reading the cache on these runs by passing
       #   enable_from_cache: true.
+      # - file: the caller-supplied Dockerfile path (default ./Dockerfile)
       # -----------------------------------------------------------------------
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@v7.0.0
         with:
           context: .
+          file: ${{ inputs.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: ${{ !startsWith(github.ref, 'refs/pull/') }}
           tags: ${{ steps.meta.outputs.tags }}
